@@ -1,0 +1,58 @@
+
+services:
+  auth-service:
+    build:
+      context: ./auth-service
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      - MONGODB_URI=mongodb://mongo:27017/authdb
+      - JWT_SECRET=your_jwt_secret
+      - GOOGLE_CLIENT_ID=45650020965-hunvau3db1dfabs420i7d4msif4o8lqg.apps.googleusercontent.com
+      - GOOGLE_CLIENT_SECRET=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
+      - EMAIL_USER=caovananhnd2024@gmail.com
+      - EMAIL_PASS=cexjgapfdqwflzkx
+    depends_on:
+      - mongo
+    networks:
+      - app-network
+
+  user-service:
+    build:
+      context: ./user-service
+      dockerfile: Dockerfile
+    ports:
+      - "3002:3002"
+    environment:
+      - MONGODB_URI=mongodb://mongo:27017/userdb
+      - JWT_SECRET=your_jwt_secret
+    depends_on:
+      - mongo
+    networks:
+      - app-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    networks:
+      - app-network
+
+  mongo:
+    image: mongo:latest
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  mongo-data:
