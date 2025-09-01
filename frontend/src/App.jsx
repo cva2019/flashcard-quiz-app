@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Link, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
 import { GoogleLogin } from '@react-oauth/google';
 import axios from 'axios';
 import './QuizletStyle.css';
@@ -12,6 +12,8 @@ import ProgressTracker from './ProgressTracker';
 import FlashcardStudy from './FlashcardStudy';
 import Dashboard from './Dashboard';
 import WelcomePage from './WelcomePage';
+import ResetPassword from './ResetPassword';
+import './ForgotPassword.css';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
@@ -25,7 +27,6 @@ function App() {
   const [token, setToken] = useState(localStorage.getItem('token') || null);
   const [message, setMessage] = useState('');
   const [isProfileUpdated, setIsProfileUpdated] = useState(false);
-  const [showAccountDropdown, setShowAccountDropdown] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showForgotPasswordModal, setShowForgotPasswordModal] = useState(false);
   const [userEmail, setUserEmail] = useState('');
@@ -55,12 +56,16 @@ function App() {
             } catch (createError) {
               console.error('Failed to create profile:', createError);
             }
+          } else if (error.response?.status === 401) {
+            localStorage.removeItem('token');
+            setToken(null);
+            navigate('/');
           }
         }
       }
     };
     checkProfile();
-  }, [token]);
+  }, [token, navigate]);
 
   const handleRegister = async () => {
     try {
@@ -103,37 +108,33 @@ function App() {
       setMessage('Google login successful');
       navigate('/dashboard');
     } catch (error) {
-      setMessage('Google login failed');
+      setMessage(error.response?.data?.message || 'Google login failed');
     }
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    setToken(null);
-    setName('');
-    setUserEmail('');
-    setIsProfileUpdated(false);
-    setMessage('Logged out successfully');
-    navigate('/');
   };
 
   const handleProfileUpdate = async () => {
     try {
-      await axios.put('http://localhost:3002/profile', { name }, {
+      await axios.post('http://localhost:3002/profile', {
+        userId: token.userId,
+        email: userEmail,
+        name
+      }, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setIsProfileUpdated(true);
       setShowProfileModal(false);
       setMessage('Profile updated successfully');
     } catch (error) {
-      setMessage('Failed to update profile');
+      setMessage(error.response?.data?.message || 'Failed to update profile');
     }
   };
 
   const handleForgotPassword = async () => {
     try {
-      await axios.post('http://localhost:3001/forgot-password', { email: loginEmail });
-      setMessage('Password reset email sent');
+      const res = await axios.post('http://localhost:3001/forgot-password', {
+        email: loginEmail
+      });
+      setMessage(res.data.message);
       setShowForgotPasswordModal(false);
     } catch (error) {
       setMessage(error.response?.data?.message || 'Failed to send reset email');
@@ -141,43 +142,7 @@ function App() {
   };
 
   return (
-    <div className="main-interface">
-      {token && (
-        <div className="navbar">
-          <div className="nav-buttons-right">
-            <button className="nav-btn" onClick={() => navigate('/dashboard')}>
-              Home
-            </button>
-            <div className="account-dropdown">
-              <button
-                className="nav-btn"
-                onClick={() => setShowAccountDropdown(!showAccountDropdown)}
-              >
-                Account
-              </button>
-              {showAccountDropdown && (
-                <div className="dropdown-menu">
-                  <button
-                    className="dropdown-item"
-                    onClick={() => {
-                      setShowProfileModal(true);
-                      setShowAccountDropdown(false);
-                    }}
-                  >
-                    View Profile
-                  </button>
-                  <button
-                    className="dropdown-item"
-                    onClick={handleLogout}
-                  >
-                    Log Out
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+    <div className="app-container">
       <Routes>
         <Route path="/" element={<WelcomePage />} />
         <Route
@@ -215,6 +180,7 @@ function App() {
             </div>
           }
         />
+        <Route path="/reset-password" element={<ResetPassword setMessage={setMessage} />} />
         <Route path="/dashboard" element={<Dashboard token={token} />} />
         <Route path="/flashcards" element={<FlashcardSetManager token={token} />} />
         <Route path="/flashcards/:setId" element={<FlashcardCreator token={token} />} />
@@ -249,17 +215,21 @@ function App() {
             <button className="login-btn" onClick={handleProfileUpdate}>
               Update
             </button>
+            <button className="login-btn" onClick={() => setShowProfileModal(false)}>
+              Cancel
+            </button>
           </div>
         </div>
       )}
       {showForgotPasswordModal && (
-        <div className="modal">
-          <div className="modal-content">
-            <span className="close" onClick={() => setShowForgotPasswordModal(false)}>&times;</span>
-            <h2>Forgot Password</h2>
+        <div className="popup-overlay" role="dialog" aria-labelledby="forgot-password-title">
+          <div className="popup-content">
+            <span className="close" onClick={() => setShowForgotPasswordModal(false)} aria-label="Close">&times;</span>
+            <h2 id="forgot-password-title">Quên mật khẩu</h2>
             <div>
-              <label>Email:</label>
+              <label htmlFor="forgot-password-email">Email:</label>
               <input
+                id="forgot-password-email"
                 type="email"
                 value={loginEmail}
                 onChange={(e) => setLoginEmail(e.target.value)}
@@ -268,7 +238,10 @@ function App() {
               />
             </div>
             <button className="login-btn" onClick={handleForgotPassword}>
-              Send Request
+              Gửi yêu cầu
+            </button>
+            <button className="login-btn" onClick={() => setShowForgotPasswordModal(false)}>
+              Hủy
             </button>
           </div>
         </div>

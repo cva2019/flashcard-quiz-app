@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import './QuizletStyle.css';
+
+import './FlashcardSetManager.css';
 
 const FlashcardSetManager = ({ token }) => {
   const navigate = useNavigate();
@@ -11,7 +12,7 @@ const FlashcardSetManager = ({ token }) => {
 
   useEffect(() => {
     if (!token) {
-      setMessage('Please log in to manage flashcard sets');
+      setMessage('Vui lòng đăng nhập để quản lý bộ flashcard');
       navigate('/');
       return;
     }
@@ -22,72 +23,122 @@ const FlashcardSetManager = ({ token }) => {
         });
         setSets(res.data);
       } catch (error) {
-        setMessage('Failed to load flashcard sets: ' + (error.response?.data?.message || 'Unknown error'));
+        setMessage(`Không thể tải danh sách thư mục: ${error.response?.data?.message || 'Lỗi không xác định'}`);
       }
     };
     fetchSets();
   }, [token, navigate]);
 
   const handleCreateSet = async () => {
-    if (!title) {
-      setMessage('Please enter a title');
+    if (!token) {
+      setMessage('Vui lòng đăng nhập để tạo bộ flashcard');
+      navigate('/');
       return;
     }
-    if (!token) {
-      setMessage('Please log in to create a flashcard set');
-      navigate('/');
+    if (!title) {
+      setMessage('Vui lòng nhập tiêu đề');
       return;
     }
     try {
       await axios.post('http://localhost:3002/flashcard-set', { title }, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setMessage('Flashcard set created');
+      setMessage('Tạo bộ flashcard thành công');
       setTitle('');
       const updatedSets = await axios.get('http://localhost:3002/flashcard-sets', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setSets(updatedSets.data);
     } catch (error) {
-      setMessage('Failed to create flashcard set: ' + (error.response?.data?.message || 'Unknown error'));
+      setMessage(`Không thể tạo bộ flashcard: ${error.response?.data?.message || 'Lỗi không xác định'}`);
+    }
+  };
+
+  const handleDeleteSet = async (id) => {
+    try {
+      await axios.delete(`http://localhost:3002/flashcard-set/${id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setMessage('Xóa bộ flashcard thành công');
+      setSets(sets.filter(set => set._id !== id));
+    } catch (error) {
+      setMessage(`Không thể xóa bộ flashcard: ${error.response?.data?.message || 'Lỗi không xác định'}`);
+      console.error('Delete error:', error.response?.data);
     }
   };
 
   return (
-    <div className="content-page">
-      <div className="content-section">
-        <div className="nav-buttons">
-          <button className="back-btn" onClick={() => navigate('/dashboard')} title="Back">←</button>
+    <div className="setmanager-container">
+      <nav className="setmanager-navbar">
+        <div className="setmanager-logo">Flashcard Pro</div>
+        <div className="setmanager-nav-links">
+          <button className="setmanager-nav-btn" onClick={() => navigate('/dashboard')}>
+            Dashboard
+          </button>
+          <button className="setmanager-nav-btn" onClick={() => navigate('/study')}>
+            Học
+          </button>
+          <button className="setmanager-nav-btn" onClick={() => navigate('/flashcards')}>
+            Tạo thẻ
+          </button>
+          <button className="setmanager-nav-btn" onClick={() => navigate('/progress')}>
+            Thống kê
+          </button>
+          <button className="setmanager-nav-btn" onClick={() => navigate('/')}>
+            Đăng xuất
+          </button>
         </div>
-        <h2>Manage Flashcard Sets</h2>
-        <div className="content-create">
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Flashcard Set Title"
-            className="content-input"
-          />
-          <button className="content-btn" onClick={handleCreateSet}>Create New Set</button>
+      </nav>
+
+      <section className="setmanager-hero-section">
+        <div className="setmanager-hero-content">
+          <h2>Tạo Thư mục Học Tập</h2>
+          <div className="setmanager-content-create">
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Tên thư mục"
+              className="setmanager-content-input"
+            />
+            <button className="setmanager-content-btn" onClick={handleCreateSet}>
+              Tạo thư mục
+            </button>
+          </div>
         </div>
-        <h3>Your Flashcard Sets</h3>
-        <div className="set-list">
+      </section>
+
+      <section className="setmanager-features-section">
+        <h2>Danh sách Thư mục</h2>
+        <div className="setmanager-features-grid">
           {sets.length > 0 ? (
             sets.map(set => (
-              <div key={set._id} className="set-item">
-                <Link to={`/flashcards/${set._id}`} className="auth-link">{set.title}</Link>
-                <div className="set-actions">
-                  <Link to={`/flashcards/${set._id}`} className="content-btn">Add Flashcards</Link>
-                  <Link to={`/quiz/${set._id}`} className="content-btn">Start Quiz</Link>
+              <div key={set._id} className="setmanager-folder-card">
+                <div className="setmanager-card-item">
+                  <h3>{set.title}</h3>
+                  <div className="setmanager-flashcard-actions">
+                    <button
+                      className="setmanager-content-btn"
+                      onClick={() => navigate(`/flashcards/${set._id}`)}
+                    >
+                      Xem thẻ
+                    </button>
+                    <button
+                      className="setmanager-content-btn"
+                      onClick={() => handleDeleteSet(set._id)}
+                    >
+                      Xóa
+                    </button>
+                  </div>
                 </div>
               </div>
             ))
           ) : (
-            <p>No flashcard sets available.</p>
+            <p>Không có bộ flashcard nào.</p>
           )}
         </div>
-        {message && <p className="message">{message}</p>}
-      </div>
+        {message && <p className="setmanager-message">{message}</p>}
+      </section>
     </div>
   );
 };
